@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="TikShare" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>TikTok Share Filter</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">CÔNG CỤ IPHONE</p>
+        <h1>TikTok Share Filter</h1>
+        <p class="subtitle">Tìm video theo từ khóa và xếp lượt chia sẻ từ ít đến nhiều.</p>
+      </div>
+      <button id="settingsBtn" class="icon-btn" type="button" aria-label="Mở cài đặt">⚙️</button>
+    </header>
+
+    <main>
+      <section class="panel">
+        <label for="keywords">Từ khóa</label>
+        <textarea id="keywords" rows="4" placeholder="Mỗi dòng một từ khóa, ví dụ:&#10;điện thoại giá rẻ&#10;tai nghe bluetooth"></textarea>
+        <div class="hint">Có thể nhập nhiều từ khóa. Tool tự gộp và loại video trùng.</div>
+
+        <div class="grid-2">
+          <div>
+            <label for="maxResults">Số video / từ khóa</label>
+            <input id="maxResults" type="number" min="1" max="500" value="50" inputmode="numeric" />
+          </div>
+          <div>
+            <label for="dateFilter">Khoảng thời gian</label>
+            <select id="dateFilter">
+              <option value="ALL_TIME">Tất cả</option>
+              <option value="PAST_24_HOURS">24 giờ qua</option>
+              <option value="PAST_WEEK">7 ngày qua</option>
+              <option value="PAST_MONTH">30 ngày qua</option>
+              <option value="LAST_3_MONTHS">3 tháng qua</option>
+              <option value="LAST_6_MONTHS">6 tháng qua</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label for="minShares">Share tối thiểu</label>
+            <input id="minShares" type="number" min="0" value="0" inputmode="numeric" />
+          </div>
+          <div>
+            <label for="maxShares">Share tối đa</label>
+            <input id="maxShares" type="number" min="0" placeholder="Không giới hạn" inputmode="numeric" />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label for="minViews">View tối thiểu</label>
+            <input id="minViews" type="number" min="0" value="0" inputmode="numeric" />
+          </div>
+          <div>
+            <label for="sortOrder">Sắp xếp kết quả</label>
+            <select id="sortOrder">
+              <option value="share_asc">Share ít → nhiều</option>
+              <option value="share_desc">Share nhiều → ít</option>
+              <option value="view_asc">View ít → nhiều</option>
+              <option value="view_desc">View nhiều → ít</option>
+              <option value="newest">Mới nhất</option>
+              <option value="oldest">Cũ nhất</option>
+            </select>
+          </div>
+        </div>
+
+        <details class="advanced">
+          <summary>Lọc nâng cao</summary>
+          <div class="grid-2 details-grid">
+            <div>
+              <label for="minLikes">Like tối thiểu</label>
+              <input id="minLikes" type="number" min="0" value="0" inputmode="numeric" />
+            </div>
+            <div>
+              <label for="minComments">Bình luận tối thiểu</label>
+              <input id="minComments" type="number" min="0" value="0" inputmode="numeric" />
+            </div>
+          </div>
+          <label class="check-row"><input id="excludeSlideshows" type="checkbox" checked /> Loại bài trình chiếu ảnh</label>
+          <label class="check-row"><input id="strictKeyword" type="checkbox" /> Chỉ giữ video có từ khóa trong mô tả/hashtag</label>
+        </details>
+
+        <button id="searchBtn" class="primary-btn" type="button">🔎 Tìm và lọc video</button>
+        <button id="cancelBtn" class="secondary-btn hidden" type="button">Dừng tác vụ</button>
+      </section>
+
+      <section id="statusPanel" class="status-panel hidden" aria-live="polite">
+        <div class="status-line">
+          <span id="statusText">Đang chuẩn bị…</span>
+          <strong id="statusPercent">0%</strong>
+        </div>
+        <div class="progress"><div id="progressBar"></div></div>
+        <pre id="logBox"></pre>
+      </section>
+
+      <section id="resultSection" class="hidden">
+        <div class="result-head">
+          <div>
+            <p class="eyebrow">KẾT QUẢ</p>
+            <h2><span id="resultCount">0</span> video</h2>
+          </div>
+          <button id="moreActionsBtn" class="icon-btn" type="button">•••</button>
+        </div>
+
+        <div id="actionMenu" class="action-menu hidden">
+          <button id="exportXlsxBtn" type="button">Xuất Excel (.xlsx)</button>
+          <button id="exportCsvBtn" type="button">Xuất CSV</button>
+          <button id="copyAllBtn" type="button">Sao chép toàn bộ link</button>
+          <button id="clearBtn" class="danger-text" type="button">Xóa kết quả</button>
+        </div>
+
+        <div class="summary-row">
+          <div><span>Share thấp nhất</span><strong id="minShareSummary">0</strong></div>
+          <div><span>Share cao nhất</span><strong id="maxShareSummary">0</strong></div>
+          <div><span>Tổng view</span><strong id="totalViewsSummary">0</strong></div>
+        </div>
+
+        <div id="resultsList" class="results-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">CẤU HÌNH NGUỒN DỮ LIỆU</p>
+          <h2 id="settingsTitle">Cài đặt API</h2>
+        </div>
+        <button id="closeSettingsBtn" class="icon-btn" type="button">✕</button>
+      </div>
+
+      <label for="apiToken">Apify API Token</label>
+      <div class="password-wrap">
+        <input id="apiToken" type="password" autocomplete="off" placeholder="apify_api_..." />
+        <button id="toggleTokenBtn" type="button">Hiện</button>
+      </div>
+      <div class="hint">Token chỉ được lưu trên thiết bị khi bật “Ghi nhớ token”.</div>
+
+      <label class="check-row"><input id="rememberToken" type="checkbox" /> Ghi nhớ token trên iPhone</label>
+
+      <label for="actorId">Actor ID</label>
+      <input id="actorId" type="text" value="clockworks~tiktok-scraper" />
+      <div class="hint">Mặc định dùng clockworks/tiktok-scraper. Có thể đổi Actor nếu cần.</div>
+
+      <label for="sourceSort">Cách TikTok trả dữ liệu ban đầu</label>
+      <select id="sourceSort">
+        <option value="MOST_RELEVANT">Liên quan nhất</option>
+        <option value="LATEST">Mới nhất</option>
+        <option value="MOST_LIKED">Nhiều like nhất</option>
+      </select>
+
+      <label for="proxyCountry">Quốc gia proxy</label>
+      <select id="proxyCountry">
+        <option value="None">Tự động</option>
+        <option value="VN">Việt Nam</option>
+        <option value="US">Hoa Kỳ</option>
+        <option value="SG">Singapore</option>
+        <option value="TH">Thái Lan</option>
+      </select>
+
+      <button id="saveSettingsBtn" class="primary-btn" type="button">Lưu cấu hình</button>
+      <button id="loadDemoBtn" class="secondary-btn" type="button">Mở dữ liệu demo</button>
+      <p class="privacy-note">Không nhập token vào máy dùng chung. Việc thu thập dữ liệu phải tuân thủ điều khoản của TikTok và nhà cung cấp API.</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
