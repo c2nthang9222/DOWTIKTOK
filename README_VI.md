@@ -70,3 +70,22 @@ Lưu ý: Netlify Drop kéo-thả thủ công có thể không triển khai Funct
 - Lượt share có thể thay đổi theo thời gian.
 - API bên thứ ba có thể tính phí theo số kết quả và có thể thay đổi cấu trúc dữ liệu.
 - Mức 20–100 video/từ khóa thường dễ quản lý hơn trên iPhone.
+
+
+## Bản 1.1 – sửa lỗi HTTP 404 trên iPhone
+
+Bản này tự động thử hai cách kết nối:
+
+1. Netlify Function nếu site được triển khai từ GitHub và Function đã được nhận diện.
+2. Apify API trực tiếp nếu Netlify Function trả 404 hoặc không tồn tại.
+
+Vì vậy, site triển khai bằng Netlify Drag & Drop vẫn có thể chạy. Sau khi cập nhật file, hãy mở lại bằng Safari. Nếu biểu tượng cũ vẫn dùng cache, xóa biểu tượng TikShare khỏi màn hình chính rồi thêm lại.
+
+### Kiểm tra Netlify Function
+
+Mở đường dẫn sau, thay tên site của bạn:
+
+`https://TEN-SITE.netlify.app/.netlify/functions/run-tiktok`
+
+- Hiện JSON báo chỉ hỗ trợ POST/HTTP 405: Function đã được triển khai.
+- Hiện trang 404: Function chưa được triển khai; bản 1.1 sẽ tự gọi Apify trực tiếp.

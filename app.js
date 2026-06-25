@@ -412,19 +412,104 @@ function log(message) {
   els.logBox.scrollTop = els.logBox.scrollHeight;
 }
 
+let didLogDirectFallback = false;
+
 async function apiRequest(payload, signal) {
-  const response = await fetch('/.netlify/functions/run-tiktok', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    signal: signal || undefined
-  });
+  // Ưu tiên Netlify Function nếu đã được triển khai đúng. Nếu endpoint không tồn tại
+  // (thường gặp khi dùng Netlify Drag & Drop), tự chuyển sang Apify API trực tiếp.
+  let proxyFailure = null;
+  try {
+    const response = await fetch('/.netlify/functions/run-tiktok', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: signal || undefined
+    });
+    const text = await response.text();
+    let data;
+    try { data = text ? JSON.parse(text) : {}; }
+    catch {
+      if (response.status === 404) {
+        proxyFailure = new Error('Netlify Function chưa được triển khai (HTTP 404)');
+      } else {
+        throw new Error(`Máy chủ trả dữ liệu không hợp lệ (HTTP ${response.status}).`);
+      }
+    }
+
+    if (!proxyFailure && !response.ok) {
+      if (response.status === 404) {
+        proxyFailure = new Error('Netlify Function chưa được triển khai (HTTP 404)');
+      } else {
+        const message = data?.error?.message || data?.error || data?.message || `HTTP ${response.status}`;
+        throw new Error(String(message));
+      }
+    }
+    if (!proxyFailure) return data;
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    // Lỗi kết nối tới endpoint nội bộ: thử Apify trực tiếp trước khi báo lỗi.
+    proxyFailure = error;
+  }
+
+  return directApifyRequest(payload, signal, proxyFailure);
+}
+
+async function directApifyRequest(payload, signal, proxyError = null) {
+  if (!didLogDirectFallback) {
+    didLogDirectFallback = true;
+    log('Netlify Function không hoạt động; đã chuyển sang kết nối Apify trực tiếp.');
+  }
+
+  const token = String(payload?.token || '').trim();
+  if (!token) throw new Error('Thiếu Apify API Token.');
+  const action = String(payload?.action || '');
+  const base = 'https://api.apify.com/v2';
+  let url = '';
+  let options = { method: 'GET', headers: { Authorization: `Bearer ${token}` }, signal: signal || undefined };
+
+  if (action === 'start') {
+    const actorId = String(payload.actorId || 'clockworks~tiktok-scraper').trim().replace('/', '~');
+    const requested = Math.max(1, Number(payload?.input?.resultsPerPage) || 50);
+    const keywordCount = Math.max(1, Array.isArray(payload?.input?.searchQueries) ? payload.input.searchQueries.length : 1);
+    const maxItems = Math.min(5000, requested * keywordCount);
+    url = `${base}/actors/${encodeURIComponent(actorId)}/runs?maxItems=${maxItems}`;
+    options = {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload.input || {}),
+      signal: signal || undefined
+    };
+  } else if (action === 'status') {
+    url = `${base}/actor-runs/${encodeURIComponent(String(payload.runId || ''))}`;
+  } else if (action === 'dataset') {
+    const limit = Math.min(Math.max(Number(payload.limit) || 1000, 1), 5000);
+    url = `${base}/datasets/${encodeURIComponent(String(payload.datasetId || ''))}/items?clean=true&format=json&limit=${limit}`;
+  } else if (action === 'abort') {
+    url = `${base}/actor-runs/${encodeURIComponent(String(payload.runId || ''))}/abort`;
+    options = { method: 'POST', headers: { Authorization: `Bearer ${token}` }, signal: signal || undefined };
+  } else {
+    throw new Error('Action API không được hỗ trợ.');
+  }
+
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    const detail = proxyError?.message ? ` Netlify: ${proxyError.message}.` : '';
+    throw new Error(`Không thể kết nối Apify trực tiếp.${detail}`);
+  }
+
   const text = await response.text();
   let data;
   try { data = text ? JSON.parse(text) : {}; }
-  catch { throw new Error(`Máy chủ trả dữ liệu không hợp lệ (HTTP ${response.status}).`); }
+  catch { throw new Error(`Apify trả dữ liệu không hợp lệ (HTTP ${response.status}).`); }
+
   if (!response.ok) {
-    const message = data?.error?.message || data?.error || data?.message || `HTTP ${response.status}`;
+    const message = data?.error?.message || data?.error?.type || data?.error || data?.message || `HTTP ${response.status}`;
     throw new Error(String(message));
   }
   return data;
